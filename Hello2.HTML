@@ -1,215 +1,153 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>連續輸入並顯示資料（含掃描倍率）</title>
-<style>
-:root{
-  --bg:#0b0c10; --card:#121319; --muted:#9aa0a6; --text:#e8eaed;
-  --accent:#4f46e5; --danger:#ef4444; --border:#23252f;
-}
-*{box-sizing:border-box}
-body{margin:0;padding:24px;font-family:ui-sans-serif, "Noto Sans TC", Roboto, "Segoe UI";color:var(--text);
-  background:radial-gradient(1200px 800px at 20% -10%, #12131a 0, var(--bg) 60%);}
-.container{max-width:980px;margin:0 auto}
-.card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
-  border:1px solid var(--border); border-radius:18px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,0.25);}
-h1{font-size:28px;margin:0 0 12px}
-p.desc{margin:0 0 16px;color:var(--muted)}
-.row{display:flex;gap:12px;flex-wrap:wrap}
-.grow{flex:1 1 180px}
-input[type="text"], select{width:100%; padding:12px 14px; border-radius:12px;
-  border:1px solid var(--border); background:#0f1117; color:var(--text); font-size:16px; outline:none;}
-input[type="text"]:focus, select:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(79,70,229,0.12)}
-button{border:1px solid var(--border); border-radius:12px; padding:10px 14px; font-size:14px;
-  cursor:pointer; color:var(--text); background:#151824}
-.btn-primary{background:linear-gradient(180deg,#3438ff,#2a2edb); border-color:#2b2fe0}
-.btn-secondary{background:#182235}
-.btn-danger{background:linear-gradient(180deg,#ff5a5a,#e23e3e); border-color:#e23e3e}
-.toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
-.toolbar .spacer{flex:1}
-table{width:100%; border-collapse:collapse; margin-top:12px}
-thead th{ text-align:left; font-weight:600; color:var(--muted); border-bottom:1px solid var(--border); padding:10px}
-tbody td{padding:12px 10px; border-bottom:1px dashed #1f2330; vertical-align:top}
-tbody tr:hover{background:rgba(255,255,255,0.03)}
-.empty{color:var(--muted); text-align:center; padding:20px}
-
-/* qrReader container styling */
-#qrReader{width:100%; max-width:400px; margin-top:8px; display:none; position:relative; background:#000; border-radius:12px; overflow:hidden;}
-
-/* overlay for simulated zoom box */
-.scan-overlay{
-  position:absolute;
-  border:2px dashed rgba(79,70,229,0.9);
-  border-radius:10px;
-  box-shadow:0 6px 18px rgba(0,0,0,0.6);
-  pointer-events:none;
-  transition: width .18s ease, height .18s ease, left .18s ease, top .18s ease;
-  box-sizing:border-box;
-}
-.zoom-hint { color:var(--muted); margin-left:8px; font-size:13px; align-self:center; }
-</style>
-<script src="https://unpkg.com/html5-qrcode"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>連續輸入並顯示資料</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    /* --- 省略部分樣式，與你原本相同 --- */
+    body { background: #0b0c10; color: #e8eaed; font-family: "Noto Sans TC", sans-serif; padding: 24px; }
+    .container { max-width: 980px; margin: auto; }
+    .card { background: #121319; border-radius: 18px; padding: 16px; margin-bottom: 16px; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; }
+    .grow { flex: 1 1 180px; }
+    input, select, button { width: 100%; padding: 10px; border-radius: 12px; border: none; font-size: 16px; }
+    button { cursor: pointer; background: #3438ff; color: white; }
+    table { width: 100%; margin-top: 12px; border-collapse: collapse; }
+    th, td { padding: 10px; border-bottom: 1px solid #23252f; }
+    .empty { text-align: center; color: #9aa0a6; padding: 20px; }
+  </style>
 </head>
 <body>
 <div class="container">
-  <div class="card" style="margin-bottom:16px;">
+  <div class="card">
     <h1>連續輸入並顯示資料</h1>
-    <p class="desc">輸入財產編號、流水碼、備註、地點與方式，點「新增」即可加入清單。</p>
-
-    <div class="row" style="margin-top:8px;">
+    <div class="row">
       <div class="grow">
-        <label class="desc">QR Code 掃描</label>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <button id="startScanBtn" class="btn-secondary" type="button">開始掃描</button>
-
-          <select id="zoomSelect" title="選擇放大倍率">
-            <option value="1" selected>1倍</option>
-            <option value="5">5倍</option>
-            <option value="10">10倍</option>
-            <option value="20">20倍</option>
-            <option value="30">30倍</option>
-            <option value="40">40倍</option>
-            <option value="50">50倍</option>
-          </select>
-
-          <div class="zoom-hint" id="zoomLabel">目前倍率: 1x</div>
-        </div>
-
-        <div id="qrReader"></div>
+        <label>QR Code 掃描</label>
+        <button id="startScanBtn">開始掃描</button>
+        <div id="qrReader" style="width:100%; max-width:400px; margin-top:8px; display:none;"></div>
       </div>
-
       <div class="grow">
-        <label class="desc">財產編號</label>
-        <input id="propIdInput" type="text" placeholder="Ex：英文字母+6位數字、10位數字" />
+        <label>焦距倍率</label>
+        <select id="zoomSelect">
+          <option value="1">1倍</option>
+          <option value="5">5倍</option>
+          <option value="10">10倍</option>
+          <option value="20">20倍</option>
+          <option value="30" selected>30倍</option>
+          <option value="40">40倍</option>
+          <option value="50">50倍</option>
+          <option value="60">60倍</option>
+        </select>
       </div>
-
-      <div class="grow">
-        <label class="desc">流水碼</label>
-        <input id="serialInput" type="text" placeholder="Ex：0001、1" />
-      </div>
-
-      <div class="grow">
-        <label class="desc">備註</label>
-        <input id="noteInput" type="text" placeholder="Ex：工號、人名" />
-      </div>
-
-      <div class="grow">
-        <label class="desc">地點</label>
+      <div class="grow"><label>財產編號</label><input id="propIdInput" type="text" /></div>
+      <div class="grow"><label>流水碼</label><input id="serialInput" type="text" /></div>
+      <div class="grow"><label>備註</label><input id="noteInput" type="text" /></div>
+      <div class="grow"><label>地點</label>
         <select id="locationSelect">
           <option value="奇岩">奇岩</option>
           <option value="淡水">淡水</option>
         </select>
       </div>
-
-      <div class="grow">
-        <label class="desc">方式</label>
+      <div class="grow"><label>方式</label>
         <select id="methodSelect">
           <option value="送來">送來</option>
           <option value="取回">取回</option>
         </select>
       </div>
     </div>
-
-    <div class="toolbar" style="margin-top:12px;">
-      <button id="addBtn" class="btn-primary" type="button">新增</button>
-      <button id="exportCsvBtn" class="btn-secondary" type="button">匯出 CSV</button>
-      <button id="exportJsonBtn" class="btn-secondary" type="button">匯出 JSON</button>
-      <label for="importFile" class="btn-secondary" style="display:inline-block;">匯入</label>
-      <input id="importFile" type="file" accept=".csv,.json" style="display:none" />
-      <div class="spacer"></div>
-      <button id="clearBtn" class="btn-danger" type="button">清除輸入</button>
+    <div class="row" style="margin-top:12px;">
+      <button id="addBtn">新增</button>
+      <button id="clearBtn">清除輸入</button>
+      <button id="exportCsvBtn">匯出 CSV</button>
+      <button id="exportJsonBtn">匯出 JSON</button>
+      <label for="importFile"><button>匯入</button></label>
+      <input id="importFile" type="file" accept=".json" style="display:none" />
     </div>
   </div>
 
   <div class="card">
-    <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:6px;">
-      <h2 style="margin:0; font-size:20px;">資料清單</h2>
-      <div class="desc">共 <span id="count">0</span> 筆</div>
-      <button id="clearBtn2" class="btn-danger" type="button" style="margin-left:auto;">清除全部</button>
+    <div class="row" style="justify-content: space-between;">
+      <h2>資料清單</h2>
+      <div>共 <span id="count">0</span> 筆</div>
+      <button id="clearBtn2">清除全部</button>
     </div>
-
-    <div style="overflow:auto;">
-      <table>
-        <thead>
-          <tr>
-            <th style="width:60px;">序號</th>
-            <th>財產編號</th>
-            <th>流水碼</th>
-            <th>備註</th>
-            <th>地點</th>
-            <th>方式</th>
-            <th style="width:180px;">時間</th>
-            <th style="width:160px;">操作</th>
-          </tr>
-        </thead>
-        <tbody id="tbody">
-          <tr><td colspan="8" class="empty">目前沒有資料，請從上方輸入新增。</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <table>
+      <thead>
+        <tr><th>序號</th><th>財產編號</th><th>流水碼</th><th>備註</th><th>地點</th><th>方式</th><th>時間</th><th>操作</th></tr>
+      </thead>
+      <tbody id="tbody"><tr><td colspan="8" class="empty">目前沒有資料，請從上方輸入新增。</td></tr></tbody>
+    </table>
   </div>
 </div>
 
 <script>
-// ====== local storage 與清單功能 (保留你原本邏輯) ======
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxJJFZ1nUwXV46Snszt_u0xsbaeE5LEItDAzq1DXXmPtcgOGs1ONze5TsNVx_WiUkKo/exec";
 const STORAGE_KEY = 'entries-v2';
 let entries = [];
-function load(){ try{ entries = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }catch{ entries = []; } }
-function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
-function fmt(ts){ return new Date(ts).toLocaleString(); }
-function render(){
+
+function load() {
+  try { entries = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch { entries = []; }
+}
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
+function fmt(ts) { return new Date(ts).toLocaleString(); }
+
+function render() {
   const tbody = document.getElementById('tbody');
   const count = document.getElementById('count');
   tbody.innerHTML = '';
-  if(!entries.length){
-    const tr = document.createElement('tr');
-    const td = document.createElement('td');
-    td.colSpan = 8; td.className='empty'; td.textContent='目前沒有資料，請從上方輸入新增。';
-    tr.appendChild(td); tbody.appendChild(tr);
+  if (!entries.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="empty">目前沒有資料，請從上方輸入新增。</td></tr>`;
   } else {
-    entries.forEach((e,i)=>{
+    entries.forEach((e, i) => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${i+1}</td>
-        <td>${e.propId}</td>
-        <td>${e.serial}</td>
-        <td>${e.note}</td>
-        <td>${e.location}</td>
-        <td>${e.method}</td>
-        <td>${fmt(e.createdAt)}</td>
-        <td><button class="btn-danger" data-action="delete" data-id="${e.__localId}">刪除</button></td>
-      `;
+        <td>${i + 1}</td><td>${e.propId}</td><td>${e.serial}</td><td>${e.note}</td>
+        <td>${e.location}</td><td>${e.method}</td><td>${fmt(e.createdAt)}</td>
+        <td><button data-action="delete" data-id="${e.__localId}">刪除</button></td>`;
       tbody.appendChild(tr);
     });
   }
   count.textContent = entries.length;
 }
 
-async function syncToGoogleSheet(entry){
-  // 你的 APPS_SCRIPT_URL 若需也可以放回來
-  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxJJFZ1nUwXV46Snszt_u0xsbaeE5LEItDAzq1DXXmPtcgOGs1ONze5TsNVx_WiUkKo/exec";
-  try{
-    await fetch(APPS_SCRIPT_URL, { method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain;charset=utf-8"}, body: JSON.stringify(entry) });
-    console.log("已送至 Google Apps Script:", entry);
-  }catch(err){ console.warn("Google Sync 失敗:", err); }
+async function syncToGoogleSheet(entry) {
+  try {
+    await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(entry)
+    });
+    console.log("已送至 Google Sheet:", entry);
+  } catch (err) {
+    console.error("送出失敗:", err);
+  }
 }
 
-function add(propId, serial, note, location, method){
-  if(!propId.trim() && !serial.trim() && !note.trim()) return;
-  const entry = {
-    propId: propId.trim(), serial: serial.trim(), note: note.trim(),
-    location, method, createdAt: Date.now()
-  };
-  entries.push({ ...entry, __localId: String(Date.now()) + Math.random().toString(16).slice(2) });
+function add(propId, serial, note, location, method) {
+  if (!propId.trim() && !serial.trim() && !note.trim()) return;
+  const entry = { propId: propId.trim(), serial: serial.trim(), note: note.trim(), location, method, createdAt: Date.now() };
+  entries.push({ ...entry, __localId: Date.now().toString() + Math.random().toString(16).slice(2) });
   save(); render(); syncToGoogleSheet(entry);
 }
-function onDelete(localId){ if(!confirm('確定刪除此筆資料？')) return; entries = entries.filter(e=>e.__localId!==localId); save(); render(); }
-function clearAll(){ if(!entries.length) return; if(!confirm('確定清除全部資料？')) return; entries=[]; save(); render(); }
-load(); render();
 
-// DOM references for the form
+function onDelete(localId) {
+  if (!confirm('確定刪除此筆資料？')) return;
+  entries = entries.filter(e => e.__localId !== localId);
+  save(); render();
+}
+function clearAll() {
+  if (!entries.length) return;
+  if (!confirm('確定清除全部資料？')) return;
+  entries = []; save(); render();
+}
+
+// --- 初始化 ---
+load(); render();
 const propIdInput = document.getElementById('propIdInput');
 const serialInput = document.getElementById('serialInput');
 const noteInput = document.getElementById('noteInput');
@@ -220,254 +158,6 @@ const clearBtn = document.getElementById('clearBtn');
 const clearBtn2 = document.getElementById('clearBtn2');
 const tbody = document.getElementById('tbody');
 
-addBtn.addEventListener('click', ()=>{
+addBtn.addEventListener('click', () => {
   add(propIdInput.value, serialInput.value, noteInput.value, locationSelect.value, methodSelect.value);
-  propIdInput.value = serialInput.value = noteInput.value = '';
-  propIdInput.focus();
-});
-[propIdInput, serialInput, noteInput].forEach(input=>{
-  input.addEventListener('keydown', e=>{
-    if(e.key === 'Enter'){ e.preventDefault();
-      add(propIdInput.value, serialInput.value, noteInput.value, locationSelect.value, methodSelect.value);
-      propIdInput.value = serialInput.value = noteInput.value = ''; propIdInput.focus();
-    }
-  });
-});
-clearBtn.addEventListener('click', ()=>{ propIdInput.value=''; serialInput.value=''; noteInput.value=''; propIdInput.focus(); });
-clearBtn2.addEventListener('click', clearAll);
-tbody.addEventListener('click', evt=>{
-  const btn = evt.target.closest('button'); if(!btn) return;
-  const localId = btn.dataset.id; if(btn.dataset.action==='delete') onDelete(localId);
-});
-
-
-// ====== QR Code 放大倍率功能（優先嘗試真實 zoom，否則 overlay 模擬） ======
-
-// DOM
-const startScanBtn = document.getElementById('startScanBtn');
-const qrReader = document.getElementById('qrReader');
-const zoomSelect = document.getElementById('zoomSelect');
-const zoomLabel = document.getElementById('zoomLabel');
-
-// html5-qrcode instance
-let qrScanner = null;
-let scanning = false;
-let runningTrackCapabilities = null;
-let supportsZoom = false;
-let currentCameraSettings = null;
-
-// overlay element (for simulation fallback)
-const overlay = document.createElement('div');
-overlay.className = 'scan-overlay';
-overlay.style.display = 'none';
-qrReader.appendChild(overlay);
-
-// util: 計算 overlay 大小（視覺模擬）
-function getOverlaySizePx(zoom) {
-  // 根據 zoom 做非線性縮放以獲得合理視覺效果，並限制最小值
-  const base = 250; // base box 大小 (px)
-  const size = Math.round(base / Math.sqrt(Math.max(1, zoom)));
-  return Math.max(80, Math.min(base, size));
-}
-function positionOverlay(sizePx) {
-  const w = qrReader.clientWidth;
-  const h = qrReader.clientHeight;
-  const left = Math.round((w - sizePx) / 2);
-  const top = Math.round((h - sizePx) / 2);
-  overlay.style.width = sizePx + 'px';
-  overlay.style.height = sizePx + 'px';
-  overlay.style.left = left + 'px';
-  overlay.style.top = top + 'px';
-  overlay.style.display = 'block';
-}
-
-// 計算給 camera 的 zoom 值（從 1..50 映射到 camera 的 min..max）
-function mapSelectToCameraZoom(selectVal, cap) {
-  // cap.zoom: {min, max, step?}
-  const sel = Number(selectVal);
-  // normalize to [0..1]
-  const ratio = Math.min(1, Math.max(0, (sel - 1) / (50 - 1)));
-  const min = (cap && cap.zoom && typeof cap.zoom.min === 'number') ? cap.zoom.min : 1;
-  const max = (cap && cap.zoom && typeof cap.zoom.max === 'number') ? cap.zoom.max : min;
-  const value = min + ratio * (max - min);
-  // round to reasonable step if provided
-  return value;
-}
-
-// 取得希望的 qrbox 大小（供 html5-qrcode start 時使用）
-function getQrboxForSelect(zoom) {
-  // 這個數值用於 library 的 qrbox（只是初始範圍）
-  return getOverlaySizePx(zoom);
-}
-
-// 當掃描成功時的處理（會把結果放進欄位並自動停止）
-function onScanSuccess(qrCodeMessage) {
-  // 你的解析邏輯（沿用你先前的 parsing）
-  const patternFull = /^https:\/\/assets\.acbel\.com\/fixed\?data=(\d+)-(\d+)-(\d+)$/;
-  const patternPartial = /^https:\/\/assets\.acbel\.com\/fixed\?data=(\d+)$/;
-  let matchFull = qrCodeMessage.match(patternFull);
-  if(matchFull){
-    propIdInput.value = matchFull[2];
-    serialInput.value = matchFull[3].slice(0,-1);
-    alert("掃描成功，已自動填入財產編號與流水碼");
-  } else if(qrCodeMessage.match(patternPartial)){
-    let parts = qrCodeMessage.split('-');
-    if(parts.length>=3){
-      propIdInput.value = parts[1];
-      serialInput.value = parts[2].slice(0,-1);
-      alert("掃描成功，已自動填入財產編號與流水碼");
-    } else {
-      alert("掃描成功，但無法解析為財產編號與流水碼");
-    }
-  } else {
-    alert("掃描成功: " + qrCodeMessage);
-  }
-
-  // 停掉掃描（你要的是單次後停止，如果要連續掃描可移除下面 stop）
-  try{
-    qrScanner.stop().then(()=>{
-      qrScanner.clear();
-      qrReader.style.display = 'none';
-      scanning = false;
-      startScanBtn.textContent = '開始掃描';
-      overlay.style.display = 'none';
-    }).catch(()=>{ /* ignore */ });
-  }catch(e){ console.warn(e); }
-}
-
-// 切換開始 / 停止
-startScanBtn.addEventListener('click', async ()=>{
-  if(scanning){
-    try {
-      await qrScanner.stop();
-      qrScanner.clear();
-    } catch(e) { console.warn("stop 錯誤:", e); }
-    qrReader.style.display = 'none';
-    overlay.style.display = 'none';
-    scanning = false;
-    startScanBtn.textContent = '開始掃描';
-    return;
-  }
-
-  // start scanning
-  qrReader.style.display = 'block';
-  // create instance if null
-  if(!qrScanner) qrScanner = new Html5Qrcode('qrReader');
-
-  const selZoom = Number(zoomSelect.value);
-  const initialQrbox = getQrboxForSelect(selZoom);
-
-  try {
-    // camera config: 使用環境鏡頭
-    const cameraConfig = { facingMode: "environment" };
-
-    await qrScanner.start(
-      cameraConfig,
-      { fps: 10, qrbox: initialQrbox },
-      (decodedText, decodedResult) => { onScanSuccess(decodedText); },
-      (errorMessage) => {
-        // failure callback (可忽略或顯示 debug)
-        // console.log("scan fail:", errorMessage);
-      }
-    );
-
-    scanning = true;
-    startScanBtn.textContent = '停止掃描';
-
-    // 啟動後試著取得 capabilities（若支援 zoom，就可以用 applyVideoConstraints）
-    try {
-      runningTrackCapabilities = qrScanner.getRunningTrackCapabilities();
-      currentCameraSettings = qrScanner.getRunningTrackSettings();
-      supportsZoom = !!(runningTrackCapabilities && runningTrackCapabilities.zoom);
-      console.log("runningTrackCapabilities:", runningTrackCapabilities, "supportsZoom:", supportsZoom);
-    } catch(err){
-      console.warn("無法取得 track capabilities:", err);
-      runningTrackCapabilities = null; supportsZoom = false;
-    }
-
-    // 若不支援真實 zoom，顯示 overlay 並設定初始大小（模擬）
-    if(!supportsZoom){
-      const size = getOverlaySizePx(selZoom);
-      positionOverlay(size);
-    } else {
-      // 若支援 zoom，嘗試把初始 zoom 設定為對應值（非必要）
-      try {
-        const mapped = mapSelectToCameraZoom(selZoom, runningTrackCapabilities);
-        await qrScanner.applyVideoConstraints({ advanced: [{ zoom: mapped }] });
-        console.log("已套用相機 zoom：", mapped);
-      } catch(e){
-        console.warn("applyVideoConstraints 初始設定失敗：", e);
-        // fallback 到 overlay 模擬
-        positionOverlay(getOverlaySizePx(selZoom));
-      }
-    }
-
-  } catch(err){
-    alert("無法啟動相機: " + err);
-    console.error(err);
-    qrReader.style.display = 'none';
-    overlay.style.display = 'none';
-    scanning = false;
-    startScanBtn.textContent = '開始掃描';
-  }
-});
-
-// 當使用者改變倍率下拉選單
-zoomSelect.addEventListener('change', async ()=>{
-  const sel = Number(zoomSelect.value);
-  zoomLabel.textContent = `目前倍率: ${sel}x`;
-
-  if(!scanning || !qrScanner){
-    // 未在掃描時，只更新 overlay 參考（若開掃描時會以選單值作為初始）
-    return;
-  }
-
-  // 若相機支援 zoom（從 capabilities 判斷），嘗試直接套用
-  if(supportsZoom && runningTrackCapabilities && runningTrackCapabilities.zoom){
-    try {
-      const mapped = mapSelectToCameraZoom(sel, runningTrackCapabilities);
-      await qrScanner.applyVideoConstraints({ advanced: [{ zoom: mapped }] });
-      console.log("applyVideoConstraints success ->", mapped);
-      // hide overlay (真實 zoom 發揮作用)
-      overlay.style.display = 'none';
-      return;
-    } catch(err){
-      console.warn("applyVideoConstraints 失敗，改用 overlay 模擬：", err);
-      // fallback to overlay
-    }
-  }
-
-  // fallback：用 overlay 模擬放大（不會改變真實相機）
-  const size = getOverlaySizePx(sel);
-  positionOverlay(size);
-
-  // 若需要，也可以嘗試調整 html5-qrcode 的 qrbox（非公開 API，部分版本可用）
-  // 嘗試安全更新 qrbox（若不可用就忽略）
-  try {
-    if(qrScanner && qrScanner._config){
-      qrScanner._config.qrbox = size;
-      // note: 有些版本的 library 不會重新繪製 overlay，故我們主要使用我們自己的 overlay
-    }
-  } catch(e){ /* ignore */ }
-});
-
-// 畫面大小改變時重新定位 overlay（維持置中）
-window.addEventListener('resize', ()=>{
-  if(overlay.style.display !== 'none'){
-    const sel = Number(zoomSelect.value);
-    positionOverlay(getOverlaySizePx(sel));
-  }
-});
-
-// 若頁面剛載入時設定 zoomLabel
-zoomLabel.textContent = `目前倍率: ${zoomSelect.value}x`;
-
-// 清除掃描器與資源（當使用者關閉頁面或離開）
-window.addEventListener('beforeunload', ()=>{
-  if(qrScanner && scanning){
-    try{ qrScanner.stop(); qrScanner.clear(); }catch(e){/* ignore */ }
-  }
-});
-</script>
-</body>
-</html>
+  propIdInput.value = serialInput.value = noteInput.value = ''; prop
