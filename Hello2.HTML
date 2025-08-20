@@ -1,69 +1,204 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <title>QR Code 掃描器</title>
-  <style>
-    body { font-family: sans-serif; text-align: center; margin-top: 30px; }
-    video { width: 300px; border: 2px solid #ccc; margin-top: 10px; }
-    #result { margin-top: 20px; font-size: 1.2em; }
-    #focusControl { margin-top: 20px; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>連續輸入並顯示資料</title>
+<style>
+:root {
+  --bg: #0b0c10; --card: #121319; --muted: #9aa0a6; --text: #e8eaed;
+  --accent: #4f46e5; --accent-2: #22c55e; --danger: #ef4444; --border: #23252f;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 24px;
+  font-family: ui-sans-serif, -apple-system, "Noto Sans TC", Roboto, "Segoe UI", Helvetica, Arial;
+  color: var(--text);
+  background: radial-gradient(1200px 800px at 20% -10%, #12131a 0, var(--bg) 60%);
+}
+.container { max-width: 980px; margin: 0 auto; }
+.card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+  border: 1px solid var(--border); border-radius: 18px; padding: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+h1 { font-size: 28px; margin: 0 0 12px; letter-spacing: 0.5px; }
+p.desc { margin: 0 0 16px; color: var(--muted); }
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.grow { flex: 1 1 180px; }
+input[type="text"], select {
+  width: 100%; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--border); outline: none;
+  background: #0f1117; color: var(--text); font-size: 16px;
+}
+input[type="text"]:focus, select:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,70,229,0.25);
+}
+button {
+  border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px;
+  font-size: 14px; cursor: pointer; color: var(--text); background: #151824;
+  transition: transform .04s ease, box-shadow .2s ease, background .2s ease;
+}
+button:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+button:active { transform: translateY(1px); }
+.btn-primary { background: linear-gradient(180deg, #3438ff, #2a2edb); border-color: #2b2fe0; }
+.btn-secondary { background: #182235; }
+.btn-danger { background: linear-gradient(180deg, #ff5a5a, #e23e3e); border-color: #e23e3e; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.toolbar .spacer { flex: 1; }
+table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+thead th {
+  text-align: left; font-weight: 600; color: var(--muted);
+  border-bottom: 1px solid var(--border); padding: 10px;
+}
+tbody td {
+  padding: 12px 10px; border-bottom: 1px dashed #1f2330; vertical-align: top;
+}
+tbody tr:hover { background: rgba(255,255,255,0.03); }
+.empty { color: var(--muted); text-align: center; padding: 20px; }
+</style>
+<script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body>
-  <h1>📷 QR Code 掃描器</h1>
-  <video id="video" autoplay playsinline></video>
-  <canvas id="canvas" hidden></canvas>
-  <div id="result">掃描結果會顯示在這裡</div>
-  <div id="focusControl">
-    <label for="zoomRange">調整鏡頭變焦：</label>
-    <input type="range" id="zoomRange" min="1" max="5" step="0.1" value="1">
+<div class="container">
+  <div class="card" style="margin-bottom: 16px;">
+    <h1>連續輸入並顯示資料</h1>
+    <p class="desc">輸入財產編號、流水碼、備註、地點與方式，點「新增」即可加入清單。</p>
+    <div class="row" style="margin-top: 8px;">
+      <div class="grow">
+        <label class="desc">QR Code 掃描</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button id="startScanBtn" class="btn-secondary" type="button">開始掃描</button>
+          <select id="zoomSelect">
+            <option value="1" selected>1倍 (預設)</option>
+            <option value="5">5倍</option>
+            <option value="10">10倍</option>
+            <option value="20">20倍</option>
+            <option value="30">30倍</option>
+            <option value="40">40倍</option>
+            <option value="50">50倍</option>
+          </select>
+          <span id="zoomLabel" class="desc">目前倍率: 1x</span>
+        </div>
+        <div id="qrReader" style="width:100%; max-width:400px; margin-top:8px; display:none;"></div>
+      </div>
+      <div class="grow">
+        <label class="desc">財產編號</label>
+        <input id="propIdInput" type="text" placeholder="Ex：英文字母+6位數字、10位數字" />
+      </div>
+      <div class="grow">
+        <label class="desc">流水碼</label>
+        <input id="serialInput" type="text" placeholder="Ex：0001、1" />
+      </div>
+      <div class="grow">
+        <label class="desc">備註</label>
+        <input id="noteInput" type="text" placeholder="Ex：工號、人名" />
+      </div>
+      <div class="grow">
+        <label class="desc">地點</label>
+        <select id="locationSelect">
+          <option value="奇岩">奇岩</option>
+          <option value="淡水">淡水</option>
+        </select>
+      </div>
+      <div class="grow">
+        <label class="desc">方式</label>
+        <select id="methodSelect">
+          <option value="送來">送來</option>
+          <option value="取回">取回</option>
+        </select>
+      </div>
+    </div>
+    <div class="toolbar" style="margin-top: 12px;">
+      <button id="addBtn" class="btn-primary" type="button">新增</button>
+      <button id="exportCsvBtn" class="btn-secondary" type="button">匯出 CSV</button>
+      <button id="exportJsonBtn" class="btn-secondary" type="button">匯出 JSON</button>
+      <label for="importFile" class="btn-secondary" style="display:inline-block;">匯入</label>
+      <input id="importFile" type="file" accept=".csv,.json" style="display:none" />
+      <div class="spacer"></div>
+      <button id="clearBtn" class="btn-danger" type="button">清除輸入</button>
+    </div>
   </div>
 
-  <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
-  <script>
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    let currentTrack = null;
+  <div class="card">
+    <div class="row" style="justify-content: space-between; align-items:center; margin-bottom: 6px;">
+      <h2 style="margin:0; font-size:20px;">資料清單</h2>
+      <div class="desc">共 <span id="count">0</span> 筆</div>
+      <button id="clearBtn2" class="btn-danger" type="button" style="margin-left: auto;">清除全部</button>
+    </div>
+    <div style="overflow:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 60px;">序號</th>
+            <th>財產編號</th>
+            <th>流水碼</th>
+            <th>備註</th>
+            <th>地點</th>
+            <th>方式</th>
+            <th style="width: 180px;">時間</th>
+            <th style="width: 160px;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr><td colspan="8" class="empty">目前沒有資料，請從上方輸入新增。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-      .then(stream => {
-        video.srcObject = stream;
-        currentTrack = stream.getVideoTracks()[0];
+<script>
+// ====== QR Code 放大倍率處理 ======
+let qrScanner=null;
+const startScanBtn=document.getElementById('startScanBtn');
+const qrReader=document.getElementById('qrReader');
+const zoomSelect=document.getElementById('zoomSelect');
+const zoomLabel=document.getElementById('zoomLabel');
 
-        // 掃描 QR Code
-        setInterval(() => {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imageData.data, canvas.width, canvas.height);
-          if (code) {
-            document.getElementById("result").innerText = `✅ 掃描成功：${code.data}`;
-          }
-        }, 500);
-      })
-      .catch(err => {
-        console.error("🚫 無法開啟鏡頭：", err);
-      });
+// 計算倍率對應的 qrbox 大小
+function getQrboxSize(zoom) {
+  return Math.max(100, 250 / (zoom / 1));
+}
 
-    // 使用 zoom 調整鏡頭
-    document.getElementById("zoomRange").addEventListener("input", function () {
-      const zoomValue = parseFloat(this.value);
-      if (currentTrack && currentTrack.getCapabilities) {
-        const capabilities = currentTrack.getCapabilities();
-        if (capabilities.zoom) {
-          currentTrack.applyConstraints({
-            advanced: [{ zoom: zoomValue }]
-          }).catch(err => {
-            console.warn("⚠️ 變焦調整失敗或不支援：", err);
-          });
-        } else {
-          console.warn("⚠️ 裝置不支援 zoom 屬性");
-        }
-      }
+startScanBtn.addEventListener('click', ()=>{
+  if(qrScanner){
+    qrScanner.stop().then(()=>{
+      qrScanner.clear(); qrReader.style.display='none'; qrScanner=null;
+      startScanBtn.textContent='開始掃描';
     });
-  </script>
+  } else {
+    qrReader.style.display='block';
+    qrScanner = new Html5Qrcode("qrReader");
+
+    let zoom = parseInt(zoomSelect.value, 10);
+    let qrboxSize = getQrboxSize(zoom);
+
+    qrScanner.start(
+      {facingMode:"environment"},
+      {fps:10, qrbox: qrboxSize},
+      qrCodeMessage=>{
+        alert("掃描成功: " + qrCodeMessage);
+        qrScanner.stop().then(()=>{
+          qrScanner.clear(); qrReader.style.display='none'; qrScanner=null;
+          startScanBtn.textContent='開始掃描';
+        });
+      }
+    ).then(()=>{ startScanBtn.textContent='停止掃描'; })
+     .catch(err=>{ alert("無法啟動相機: " + err); });
+  }
+});
+
+// 🔹 掃描進行中動態切換倍率
+zoomSelect.addEventListener('change', ()=>{
+  let zoom = parseInt(zoomSelect.value, 10);
+  zoomLabel.textContent = `目前倍率: ${zoom}x`;
+  if(qrScanner){
+    let qrboxSize = getQrboxSize(zoom);
+    qrScanner._config.qrbox = qrboxSize;  
+    console.log("倍率切換為:", zoom, "倍 -> qrbox =", qrboxSize);
+  }
+});
+</script>
 </body>
 </html>
