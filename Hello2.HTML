@@ -1,163 +1,119 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>連續輸入並顯示資料</title>
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <meta charset="UTF-8">
+  <title>QR Code 掃描器 + 鏡頭預覽</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <style>
-    /* --- 省略部分樣式，與你原本相同 --- */
-    body { background: #0b0c10; color: #e8eaed; font-family: "Noto Sans TC", sans-serif; padding: 24px; }
-    .container { max-width: 980px; margin: auto; }
-    .card { background: #121319; border-radius: 18px; padding: 16px; margin-bottom: 16px; }
-    .row { display: flex; flex-wrap: wrap; gap: 12px; }
-    .grow { flex: 1 1 180px; }
-    input, select, button { width: 100%; padding: 10px; border-radius: 12px; border: none; font-size: 16px; }
-    button { cursor: pointer; background: #3438ff; color: white; }
-    table { width: 100%; margin-top: 12px; border-collapse: collapse; }
-    th, td { padding: 10px; border-bottom: 1px solid #23252f; }
-    .empty { text-align: center; color: #9aa0a6; padding: 20px; }
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    #reader {
+      margin: auto;
+      width: 300px;
+      height: 300px;
+      border: 1px solid #ccc;
+    }
+    #camera-preview {
+      margin-top: 20px;
+      width: 300px;
+      height: 200px;
+      border: 1px solid #ccc;
+      object-fit: cover;
+    }
+    select {
+      font-size: 16px;
+      padding: 5px;
+      margin-bottom: 10px;
+    }
+    #result {
+      margin-top: 15px;
+      font-weight: bold;
+      color: green;
+    }
   </style>
 </head>
 <body>
-<div class="container">
-  <div class="card">
-    <h1>連續輸入並顯示資料</h1>
-    <div class="row">
-      <div class="grow">
-        <label>QR Code 掃描</label>
-        <button id="startScanBtn">開始掃描</button>
-        <div id="qrReader" style="width:100%; max-width:400px; margin-top:8px; display:none;"></div>
-      </div>
-      <div class="grow">
-        <label>焦距倍率</label>
-        <select id="zoomSelect">
-          <option value="1">1倍</option>
-          <option value="5">5倍</option>
-          <option value="10">10倍</option>
-          <option value="20">20倍</option>
-          <option value="30" selected>30倍</option>
-          <option value="40">40倍</option>
-          <option value="50">50倍</option>
-          <option value="60">60倍</option>
-        </select>
-      </div>
-      <div class="grow"><label>財產編號</label><input id="propIdInput" type="text" /></div>
-      <div class="grow"><label>流水碼</label><input id="serialInput" type="text" /></div>
-      <div class="grow"><label>備註</label><input id="noteInput" type="text" /></div>
-      <div class="grow"><label>地點</label>
-        <select id="locationSelect">
-          <option value="奇岩">奇岩</option>
-          <option value="淡水">淡水</option>
-        </select>
-      </div>
-      <div class="grow"><label>方式</label>
-        <select id="methodSelect">
-          <option value="送來">送來</option>
-          <option value="取回">取回</option>
-        </select>
-      </div>
-    </div>
-    <div class="row" style="margin-top:12px;">
-      <button id="addBtn">新增</button>
-      <button id="clearBtn">清除輸入</button>
-      <button id="exportCsvBtn">匯出 CSV</button>
-      <button id="exportJsonBtn">匯出 JSON</button>
-      <label for="importFile"><button>匯入</button></label>
-      <input id="importFile" type="file" accept=".json" style="display:none" />
-    </div>
-  </div>
+  <h1>📷 QR Code 掃描器 + 鏡頭畫面</h1>
 
-  <div class="card">
-    <div class="row" style="justify-content: space-between;">
-      <h2>資料清單</h2>
-      <div>共 <span id="count">0</span> 筆</div>
-      <button id="clearBtn2">清除全部</button>
-    </div>
-    <table>
-      <thead>
-        <tr><th>序號</th><th>財產編號</th><th>流水碼</th><th>備註</th><th>地點</th><th>方式</th><th>時間</th><th>操作</th></tr>
-      </thead>
-      <tbody id="tbody"><tr><td colspan="8" class="empty">目前沒有資料，請從上方輸入新增。</td></tr></tbody>
-    </table>
-  </div>
-</div>
+  <label for="zoom">選擇倍率：</label>
+  <select id="zoom">
+    <option value="250">1倍</option>
+    <option value="200">5倍</option>
+    <option value="150">10倍</option>
+    <option value="100">20倍</option>
+    <option value="80">30倍</option>
+    <option value="60">40倍</option>
+    <option value="40">50倍</option>
+  </select>
 
-<script>
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxJJFZ1nUwXV46Snszt_u0xsbaeE5LEItDAzq1DXXmPtcgOGs1ONze5TsNVx_WiUkKo/exec";
-const STORAGE_KEY = 'entries-v2';
-let entries = [];
+  <div id="reader"></div>
+  <div id="result">掃描結果會顯示在這裡</div>
 
-function load() {
-  try { entries = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
-  catch { entries = []; }
-}
-function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
-function fmt(ts) { return new Date(ts).toLocaleString(); }
+  <h2>🎥 鏡頭預覽</h2>
+  <video id="camera-preview" autoplay muted playsinline></video>
 
-function render() {
-  const tbody = document.getElementById('tbody');
-  const count = document.getElementById('count');
-  tbody.innerHTML = '';
-  if (!entries.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="empty">目前沒有資料，請從上方輸入新增。</td></tr>`;
-  } else {
-    entries.forEach((e, i) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${i + 1}</td><td>${e.propId}</td><td>${e.serial}</td><td>${e.note}</td>
-        <td>${e.location}</td><td>${e.method}</td><td>${fmt(e.createdAt)}</td>
-        <td><button data-action="delete" data-id="${e.__localId}">刪除</button></td>`;
-      tbody.appendChild(tr);
+  <script>
+    const resultDiv = document.getElementById("result");
+    const zoomSelect = document.getElementById("zoom");
+    const readerId = "reader";
+    const videoElement = document.getElementById("camera-preview");
+
+    let html5QrCode;
+    let currentZoom = parseInt(zoomSelect.value);
+
+    async function startScanner() {
+      if (html5QrCode) {
+        await html5QrCode.stop();
+        html5QrCode.clear();
+      }
+
+      html5QrCode = new Html5Qrcode(readerId);
+
+      const config = {
+        fps: 10,
+        qrbox: { width: currentZoom, height: currentZoom },
+        aspectRatio: 1.0
+      };
+
+      try {
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          config,
+          qrCodeMessage => {
+            resultDiv.innerText = `✅ 掃描成功：${qrCodeMessage}`;
+          },
+          errorMessage => {
+            // 可選：console.log(`掃描錯誤：${errorMessage}`);
+          }
+        );
+      } catch (err) {
+        resultDiv.innerText = `❌ 相機啟動失敗：${err}`;
+      }
+    }
+
+    async function startCameraPreview() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+          audio: false
+        });
+        videoElement.srcObject = stream;
+      } catch (err) {
+        console.error("鏡頭預覽啟動失敗：", err);
+      }
+    }
+
+    zoomSelect.addEventListener("change", async () => {
+      currentZoom = parseInt(zoomSelect.value);
+      await startScanner();
     });
-  }
-  count.textContent = entries.length;
-}
 
-async function syncToGoogleSheet(entry) {
-  try {
-    await fetch(APPS_SCRIPT_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(entry)
-    });
-    console.log("已送至 Google Sheet:", entry);
-  } catch (err) {
-    console.error("送出失敗:", err);
-  }
-}
-
-function add(propId, serial, note, location, method) {
-  if (!propId.trim() && !serial.trim() && !note.trim()) return;
-  const entry = { propId: propId.trim(), serial: serial.trim(), note: note.trim(), location, method, createdAt: Date.now() };
-  entries.push({ ...entry, __localId: Date.now().toString() + Math.random().toString(16).slice(2) });
-  save(); render(); syncToGoogleSheet(entry);
-}
-
-function onDelete(localId) {
-  if (!confirm('確定刪除此筆資料？')) return;
-  entries = entries.filter(e => e.__localId !== localId);
-  save(); render();
-}
-function clearAll() {
-  if (!entries.length) return;
-  if (!confirm('確定清除全部資料？')) return;
-  entries = []; save(); render();
-}
-
-// --- 初始化 ---
-load(); render();
-const propIdInput = document.getElementById('propIdInput');
-const serialInput = document.getElementById('serialInput');
-const noteInput = document.getElementById('noteInput');
-const locationSelect = document.getElementById('locationSelect');
-const methodSelect = document.getElementById('methodSelect');
-const addBtn = document.getElementById('addBtn');
-const clearBtn = document.getElementById('clearBtn');
-const clearBtn2 = document.getElementById('clearBtn2');
-const tbody = document.getElementById('tbody');
-
-addBtn.addEventListener('click', () => {
-  add(propIdInput.value, serialInput.value, noteInput.value, locationSelect.value, methodSelect.value);
-  propIdInput.value = serialInput.value = noteInput.value = ''; prop
+    // 初次啟動
+    startScanner();
+    startCameraPreview();
+  </script>
+</body>
+</html>
