@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <title>QR Code 掃描器 + 鏡頭預覽</title>
+  <title>QR Code 掃描器</title>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <style>
     body {
@@ -10,18 +10,18 @@
       text-align: center;
       padding: 20px;
     }
-    #reader {
+    #reader-container {
       margin: auto;
       width: 300px;
       height: 300px;
-      border: 1px solid #ccc;
+      overflow: hidden;
+      position: relative;
     }
-    #camera-preview {
-      margin-top: 20px;
-      width: 300px;
-      height: 200px;
-      border: 1px solid #ccc;
-      object-fit: cover;
+    #reader {
+      width: 100%;
+      height: 100%;
+      transform-origin: center center;
+      transition: transform 0.3s ease;
     }
     select {
       font-size: 16px;
@@ -36,33 +36,30 @@
   </style>
 </head>
 <body>
-  <h1>📷 QR Code 掃描器 + 鏡頭畫面</h1>
-
-  <label for="zoom">選擇倍率：</label>
+  <h1>📷 QR Code 掃描器</h1>
+  <label for="zoom">選擇放大倍率：</label>
   <select id="zoom">
-    <option value="250">1倍</option>
-    <option value="200">5倍</option>
-    <option value="150">10倍</option>
-    <option value="100">20倍</option>
-    <option value="80">30倍</option>
-    <option value="60">40倍</option>
-    <option value="40">50倍</option>
+    <option value="1">1倍</option>
+    <option value="5">5倍</option>
+    <option value="10">10倍</option>
+    <option value="20">20倍</option>
+    <option value="30">30倍</option>
+    <option value="40">40倍</option>
   </select>
 
-  <div id="reader"></div>
+  <div id="reader-container">
+    <div id="reader"></div>
+  </div>
   <div id="result">掃描結果會顯示在這裡</div>
-
-  <h2>🎥 鏡頭預覽</h2>
-  <video id="camera-preview" autoplay muted playsinline></video>
 
   <script>
     const resultDiv = document.getElementById("result");
     const zoomSelect = document.getElementById("zoom");
     const readerId = "reader";
-    const videoElement = document.getElementById("camera-preview");
+    const readerDiv = document.getElementById("reader");
 
     let html5QrCode;
-    let currentZoom = parseInt(zoomSelect.value);
+    let currentScale = parseFloat(zoomSelect.value);
 
     async function startScanner() {
       if (html5QrCode) {
@@ -74,7 +71,7 @@
 
       const config = {
         fps: 10,
-        qrbox: { width: currentZoom, height: currentZoom },
+        qrbox: 250,
         aspectRatio: 1.0
       };
 
@@ -89,31 +86,23 @@
             // 可選：console.log(`掃描錯誤：${errorMessage}`);
           }
         );
+        applyZoom(currentScale);
       } catch (err) {
         resultDiv.innerText = `❌ 相機啟動失敗：${err}`;
       }
     }
 
-    async function startCameraPreview() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-          audio: false
-        });
-        videoElement.srcObject = stream;
-      } catch (err) {
-        console.error("鏡頭預覽啟動失敗：", err);
-      }
+    function applyZoom(scale) {
+      readerDiv.style.transform = `scale(${scale})`;
     }
 
     zoomSelect.addEventListener("change", async () => {
-      currentZoom = parseInt(zoomSelect.value);
-      await startScanner();
+      currentScale = parseFloat(zoomSelect.value);
+      applyZoom(currentScale);
     });
 
     // 初次啟動
     startScanner();
-    startCameraPreview();
   </script>
 </body>
 </html>
