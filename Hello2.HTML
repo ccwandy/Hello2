@@ -20,8 +20,6 @@
     #reader {
       width: 100%;
       height: 100%;
-      transform-origin: center center;
-      transition: transform 0.3s ease;
     }
     select {
       font-size: 16px;
@@ -40,11 +38,9 @@
   <label for="zoom">選擇放大倍率：</label>
   <select id="zoom">
     <option value="1">1倍</option>
-    <option value="5">5倍</option>
-    <option value="10">10倍</option>
-    <option value="20">20倍</option>
-    <option value="30">30倍</option>
-    <option value="40">40倍</option>
+    <option value="2">2倍</option>
+    <option value="3">3倍</option>
+    <option value="4">4倍</option>
   </select>
 
   <div id="reader-container">
@@ -56,10 +52,9 @@
     const resultDiv = document.getElementById("result");
     const zoomSelect = document.getElementById("zoom");
     const readerId = "reader";
-    const readerDiv = document.getElementById("reader");
 
     let html5QrCode;
-    let currentScale = parseFloat(zoomSelect.value);
+    let videoTrack; // 儲存相機 track 以便控制對焦與縮放
 
     async function startScanner() {
       if (html5QrCode) {
@@ -81,24 +76,51 @@
           config,
           qrCodeMessage => {
             resultDiv.innerText = `✅ 掃描成功：${qrCodeMessage}`;
-          },
-          errorMessage => {
-            // 可選：console.log(`掃描錯誤：${errorMessage}`);
           }
         );
-        applyZoom(currentScale);
+
+        // 取得相機 track
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
+        });
+        videoTrack = stream.getVideoTracks()[0];
+
+        // 啟用自動對焦 (若裝置支援)
+        const capabilities = videoTrack.getCapabilities();
+        if (capabilities.focusMode) {
+          await videoTrack.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+          console.log("已啟用自動對焦");
+        }
+
+        // 套用初始縮放
+        applyZoom(parseFloat(zoomSelect.value));
+
       } catch (err) {
         resultDiv.innerText = `❌ 相機啟動失敗：${err}`;
       }
     }
 
-    function applyZoom(scale) {
-      readerDiv.style.transform = `scale(${scale})`;
+    async function applyZoom(level) {
+      if (!videoTrack) return;
+      const capabilities = videoTrack.getCapabilities();
+
+      if (capabilities.zoom) {
+        const min = capabilities.zoom.min;
+        const max = capabilities.zoom.max;
+        const step = capabilities.zoom.step || 1;
+
+        let zoomValue = Math.min(max, Math.max(min, level));
+        await videoTrack.applyConstraints({ advanced: [{ zoom: zoomValue }] });
+        console.log("已設定鏡頭縮放倍率:", zoomValue);
+      } else {
+        console.log("裝置不支援鏡頭縮放，用 CSS 模擬");
+        document.getElementById("reader").style.transform = `scale(${level})`;
+      }
     }
 
     zoomSelect.addEventListener("change", async () => {
-      currentScale = parseFloat(zoomSelect.value);
-      applyZoom(currentScale);
+      const scale = parseFloat(zoomSelect.value);
+      applyZoom(scale);
     });
 
     // 初次啟動
