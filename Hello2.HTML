@@ -145,16 +145,104 @@ tbody tr:hover { background: rgba(255,255,255,0.03); }
 </div>
 
 <script>
-// ================== 保持原本 entries / add / render 的程式 ==================
+// ================== 資料清單處理 ==================
+let entries = [];
 
-// --- QR Code 掃描 + 縮放 + 自動對焦 ---
+const tbody = document.getElementById("tbody");
+const countSpan = document.getElementById("count");
+const addBtn = document.getElementById("addBtn");
+const propIdInput = document.getElementById("propIdInput");
+const serialInput = document.getElementById("serialInput");
+const noteInput = document.getElementById("noteInput");
+const locationSelect = document.getElementById("locationSelect");
+const methodSelect = document.getElementById("methodSelect");
+const clearBtn = document.getElementById("clearBtn");
+const clearBtn2 = document.getElementById("clearBtn2");
+
+// 渲染表格
+function renderTable() {
+  tbody.innerHTML = "";
+  if (entries.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" class="empty">目前沒有資料，請從上方輸入新增。</td></tr>`;
+  } else {
+    entries.forEach((e, idx) => {
+      let tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${idx + 1}</td>
+        <td>${e.propId}</td>
+        <td>${e.serial}</td>
+        <td>${e.note}</td>
+        <td>${e.location}</td>
+        <td>${e.method}</td>
+        <td>${e.time}</td>
+        <td>
+          <button class="btn-danger" onclick="deleteEntry(${idx})">刪除</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+  countSpan.textContent = entries.length;
+}
+
+// 新增資料
+addBtn.addEventListener("click", () => {
+  const propId = propIdInput.value.trim();
+  const serial = serialInput.value.trim();
+  const note = noteInput.value.trim();
+  const location = locationSelect.value;
+  const method = methodSelect.value;
+
+  if (!propId || !serial) {
+    alert("請至少輸入 財產編號 與 流水碼");
+    return;
+  }
+
+  const now = new Date();
+  const timeStr = now.toLocaleString("zh-TW");
+
+  entries.push({
+    propId,
+    serial,
+    note,
+    location,
+    method,
+    time: timeStr
+  });
+
+  renderTable();
+
+  // 清空輸入（財產編號與流水碼可以保留，備註清空）
+  noteInput.value = "";
+});
+
+// 刪除單筆
+function deleteEntry(idx) {
+  entries.splice(idx, 1);
+  renderTable();
+}
+
+// 清空輸入
+clearBtn.addEventListener("click", () => {
+  propIdInput.value = "";
+  serialInput.value = "";
+  noteInput.value = "";
+});
+
+// 清空全部
+clearBtn2.addEventListener("click", () => {
+  if (confirm("確定要清除所有資料嗎？")) {
+    entries = [];
+    renderTable();
+  }
+});
+
+// ================== QR Code 掃描 + 縮放 + 自動對焦 ==================
 let qrScanner=null;
 let videoTrack=null;
 const startScanBtn=document.getElementById('startScanBtn');
 const qrReader=document.getElementById('qrReader');
 const zoomSelect=document.getElementById('zoomSelect');
-const propIdInput=document.getElementById('propIdInput');
-const serialInput=document.getElementById('serialInput');
 
 async function applyZoom(level){
   if(!videoTrack) return;
@@ -186,7 +274,6 @@ startScanBtn.addEventListener('click', async ()=>{
         { facingMode:"environment" },
         { fps:10, qrbox:250 },
         qrCodeMessage=>{
-          // ========= 解析 QR Code =========
           const patternFull=/^https:\/\/assets\.acbel\.com\/fixed\?data=(\d+)-(\d+)-(\d+)$/;
           const patternPartial=/^https:\/\/assets\.acbel\.com\/fixed\?data=(\d+)$/;
           let matchFull=qrCodeMessage.match(patternFull);
@@ -202,14 +289,12 @@ startScanBtn.addEventListener('click', async ()=>{
               alert("掃描成功，已自動填入財產編號與流水碼");
             } else { alert("掃描成功，但無法解析為財產編號與流水碼"); }
           } else { alert("掃描成功: "+qrCodeMessage); }
-          // 自動關閉掃描
           qrScanner.stop().then(()=>{
             qrScanner.clear(); qrReader.style.display='none'; qrScanner=null; videoTrack=null;
             startScanBtn.textContent='開始掃描';
           });
         }
       );
-      // === 啟用自動對焦與縮放 ===
       const stream=await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" } });
       videoTrack=stream.getVideoTracks()[0];
       const capabilities=videoTrack.getCapabilities();
