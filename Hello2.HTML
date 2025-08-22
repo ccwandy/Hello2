@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>連續輸入並顯示資料</title>
 <style>
-/* CSS 同前面保持不變 */
 :root {
   --bg: #0b0c10; --card: #121319; --muted: #9aa0a6; --text: #e8eaed;
   --accent: #4f46e5; --accent-2: #22c55e; --danger: #ef4444; --border: #23252f;
@@ -137,8 +136,8 @@ tbody tr:hover { background: rgba(255,255,255,0.03); }
 </div>
 
 <script>
-// ========== Google Sheet 同步函式（程式碼1整合進來） ==========
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw4td1K8QNQ-5gXQopYHy20uQkFPgtodBCRwBMx2804v7k45FJU9YbtwxnX_-icXdfb/exec";
+// ========== Google Sheet 同步函式 ==========
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzxHLBTPJQhYezQg1caEd3JzXo1-WC9582cyvdE2MxuradwASnwDe5U80aqG6IAkIaZ/exec";
 
 async function syncToSheet(entry) {
   const body = new URLSearchParams(entry);
@@ -208,7 +207,16 @@ addBtn.addEventListener("click", async () => {
   }
 
   const now = new Date();
-  const entry = { propId, serial, note, location, method, time: now.toLocaleString("zh-TW") };
+  const entry = {
+    index: entries.length + 1, // ✅ 新增序號
+    propId,
+    serial,
+    note,
+    location,
+    method,
+    time: now.toLocaleString("zh-TW")
+  };
+
   entries.push(entry);
   renderTable();
   noteInput.value = "";
@@ -265,7 +273,6 @@ startScanBtn.addEventListener('click', async ()=>{
         { facingMode:"environment" },
         { fps:10, qrbox:250 },
         qrCodeMessage=>{
-          // ========= 自動解析 QR Code =========
           const patternFull=/^https:\/\/assets\.acbel\.com\/fixed\?data=(\d+)-(\d+)-(\d+)$/;
           const patternPartial=/^https:\/\/assets\.acbel\.com\/fixed\?data=(\d+)$/;
           let parsed=false;
