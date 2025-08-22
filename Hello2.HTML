@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>連續輸入並顯示資料</title>
 <style>
+/* CSS 同前面保持不變 */
 :root {
   --bg: #0b0c10; --card: #121319; --muted: #9aa0a6; --text: #e8eaed;
   --accent: #4f46e5; --accent-2: #22c55e; --danger: #ef4444; --border: #23252f;
@@ -17,8 +18,7 @@ body {
   background: radial-gradient(1200px 800px at 20% -10%, #12131a 0, var(--bg) 60%);
 }
 .container { max-width: 980px; margin: 0 auto; }
-.card {
-  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+.card { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
   border: 1px solid var(--border); border-radius: 18px; padding: 16px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.25);
 }
@@ -47,13 +47,9 @@ button:active { transform: translateY(1px); }
 .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .toolbar .spacer { flex: 1; }
 table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-thead th {
-  text-align: left; font-weight: 600; color: var(--muted);
-  border-bottom: 1px solid var(--border); padding: 10px;
-}
-tbody td {
-  padding: 12px 10px; border-bottom: 1px dashed #1f2330; vertical-align: top;
-}
+thead th { text-align: left; font-weight: 600; color: var(--muted);
+  border-bottom: 1px solid var(--border); padding: 10px; }
+tbody td { padding: 12px 10px; border-bottom: 1px dashed #1f2330; vertical-align: top; }
 tbody tr:hover { background: rgba(255,255,255,0.03); }
 .empty { color: var(--muted); text-align: center; padding: 20px; }
 </style>
@@ -63,7 +59,7 @@ tbody tr:hover { background: rgba(255,255,255,0.03); }
 <div class="container">
   <div class="card" style="margin-bottom: 16px;">
     <h1>連續輸入並顯示資料</h1>
-    <p class="desc">輸入財產編號、流水碼、備註、地點與方式，點「新增」即可加入清單。</p>
+    <p class="desc">輸入財產編號、流水碼、備註、地點與方式，點「新增」即可加入清單並同步到 Google Sheet。</p>
     <div class="row" style="margin-top: 8px;">
       <div class="grow">
         <label class="desc">QR Code 掃描</label>
@@ -106,10 +102,6 @@ tbody tr:hover { background: rgba(255,255,255,0.03); }
     </div>
     <div class="toolbar" style="margin-top: 12px;">
       <button id="addBtn" class="btn-primary" type="button">新增</button>
-      <button id="exportCsvBtn" class="btn-secondary" type="button">匯出 CSV</button>
-      <button id="exportJsonBtn" class="btn-secondary" type="button">匯出 JSON</button>
-      <label for="importFile" class="btn-secondary" style="display:inline-block;">匯入</label>
-      <input id="importFile" type="file" accept=".csv,.json" style="display:none" />
       <div class="spacer"></div>
       <button id="clearBtn" class="btn-danger" type="button">清除輸入</button>
     </div>
@@ -145,7 +137,26 @@ tbody tr:hover { background: rgba(255,255,255,0.03); }
 </div>
 
 <script>
-// ================== 資料清單處理 ==================
+// ========== Google Sheet 同步函式（程式碼1整合進來） ==========
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw4td1K8QNQ-5gXQopYHy20uQkFPgtodBCRwBMx2804v7k45FJU9YbtwxnX_-icXdfb/exec";
+
+async function syncToSheet(entry) {
+  const body = new URLSearchParams(entry);
+  const res = await fetch(GOOGLE_SCRIPT_URL, { method: "POST", body });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = null; }
+
+  if (!res.ok || !data || data.status !== "success") {
+    if (text.startsWith("<")) {
+      throw new Error("Web App 沒有設為公開。請在部署時將『誰可以存取』設為「任何人」。");
+    }
+    throw new Error((data && data.message) || (res.status + " " + res.statusText));
+  }
+  return data;
+}
+
+// ========== 資料清單處理 ==========
 let entries = [];
 
 const tbody = document.getElementById("tbody");
@@ -175,9 +186,7 @@ function renderTable() {
         <td>${e.location}</td>
         <td>${e.method}</td>
         <td>${e.time}</td>
-        <td>
-          <button class="btn-danger" onclick="deleteEntry(${idx})">刪除</button>
-        </td>
+        <td><button class="btn-danger" onclick="deleteEntry(${idx})">刪除</button></td>
       `;
       tbody.appendChild(tr);
     });
@@ -185,8 +194,8 @@ function renderTable() {
   countSpan.textContent = entries.length;
 }
 
-// 新增資料
-addBtn.addEventListener("click", () => {
+// 新增資料並同步到 Google Sheet
+addBtn.addEventListener("click", async () => {
   const propId = propIdInput.value.trim();
   const serial = serialInput.value.trim();
   const note = noteInput.value.trim();
@@ -199,45 +208,30 @@ addBtn.addEventListener("click", () => {
   }
 
   const now = new Date();
-  const timeStr = now.toLocaleString("zh-TW");
-
-  entries.push({
-    propId,
-    serial,
-    note,
-    location,
-    method,
-    time: timeStr
-  });
-
+  const entry = { propId, serial, note, location, method, time: now.toLocaleString("zh-TW") };
+  entries.push(entry);
   renderTable();
-
-  // 清空輸入（財產編號與流水碼可以保留，備註清空）
   noteInput.value = "";
-});
 
-// 刪除單筆
-function deleteEntry(idx) {
-  entries.splice(idx, 1);
-  renderTable();
-}
-
-// 清空輸入
-clearBtn.addEventListener("click", () => {
-  propIdInput.value = "";
-  serialInput.value = "";
-  noteInput.value = "";
-});
-
-// 清空全部
-clearBtn2.addEventListener("click", () => {
-  if (confirm("確定要清除所有資料嗎？")) {
-    entries = [];
-    renderTable();
+  try {
+    addBtn.disabled = true;
+    await syncToSheet(entry);
+  } catch (err) {
+    console.error(err);
+    alert("同步到 Google Sheet 發生錯誤：\n" + err.message);
+  } finally {
+    addBtn.disabled = false;
   }
 });
 
-// ================== QR Code 掃描 + 縮放 + 自動對焦 ==================
+// 刪除單筆
+function deleteEntry(idx) { entries.splice(idx, 1); renderTable(); }
+// 清空輸入
+clearBtn.addEventListener("click", () => { propIdInput.value=""; serialInput.value=""; noteInput.value=""; });
+// 清空全部
+clearBtn2.addEventListener("click", () => { if(confirm("確定要清除所有資料嗎？")){ entries=[]; renderTable(); } });
+
+// ========== QR Code 掃描 + 自動解析 + 自動新增 ==========
 let qrScanner=null;
 let videoTrack=null;
 const startScanBtn=document.getElementById('startScanBtn');
@@ -251,13 +245,10 @@ async function applyZoom(level){
     const min=capabilities.zoom.min, max=capabilities.zoom.max;
     let zoomValue=Math.min(max, Math.max(min, level));
     await videoTrack.applyConstraints({ advanced:[{ zoom: zoomValue }] });
-    console.log("已設定鏡頭縮放倍率:", zoomValue);
   } else {
-    console.log("裝置不支援鏡頭縮放，用 CSS 模擬");
     qrReader.style.transform=`scale(${level})`;
   }
 }
-
 zoomSelect.addEventListener("change", ()=> applyZoom(parseFloat(zoomSelect.value)));
 
 startScanBtn.addEventListener('click', async ()=>{
@@ -274,21 +265,31 @@ startScanBtn.addEventListener('click', async ()=>{
         { facingMode:"environment" },
         { fps:10, qrbox:250 },
         qrCodeMessage=>{
+          // ========= 自動解析 QR Code =========
           const patternFull=/^https:\/\/assets\.acbel\.com\/fixed\?data=(\d+)-(\d+)-(\d+)$/;
           const patternPartial=/^https:\/\/assets\.acbel\.com\/fixed\?data=(\d+)$/;
+          let parsed=false;
+
           let matchFull=qrCodeMessage.match(patternFull);
           if(matchFull){
-            propIdInput.value=matchFull[2];
-            serialInput.value=matchFull[3].slice(0,-1);
-            alert("掃描成功，已自動填入財產編號與流水碼");
+            propIdInput.value = matchFull[2];
+            serialInput.value = matchFull[3].slice(0,-1);
+            parsed=true;
           } else if(qrCodeMessage.match(patternPartial)){
             let parts=qrCodeMessage.split('-');
             if(parts.length>=3){
-              propIdInput.value=parts[1];
-              serialInput.value=parts[2].slice(0,-1);
-              alert("掃描成功，已自動填入財產編號與流水碼");
-            } else { alert("掃描成功，但無法解析為財產編號與流水碼"); }
-          } else { alert("掃描成功: "+qrCodeMessage); }
+              propIdInput.value = parts[1];
+              serialInput.value = parts[2].slice(0,-1);
+              parsed=true;
+            }
+          }
+
+          if(parsed){
+            addBtn.click(); // 自動新增
+          } else {
+            alert("掃描成功: "+qrCodeMessage);
+          }
+
           qrScanner.stop().then(()=>{
             qrScanner.clear(); qrReader.style.display='none'; qrScanner=null; videoTrack=null;
             startScanBtn.textContent='開始掃描';
@@ -300,7 +301,6 @@ startScanBtn.addEventListener('click', async ()=>{
       const capabilities=videoTrack.getCapabilities();
       if(capabilities.focusMode){
         await videoTrack.applyConstraints({ advanced:[{ focusMode:"continuous" }] });
-        console.log("已啟用自動對焦");
       }
       applyZoom(parseFloat(zoomSelect.value));
       startScanBtn.textContent='停止掃描';
