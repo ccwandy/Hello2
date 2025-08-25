@@ -298,9 +298,10 @@ startScanBtn.addEventListener('click', async ()=>{
           }
 
           if(parsed){
-            addBtn.click(); // 自動新增
+            // ✅ 只帶入欄位，不自動新增
+            alert("掃描成功，資料已帶入輸入框，請確認後再按『新增』。");
           } else {
-            alert("掃描成功: "+qrCodeMessage);
+            alert("掃描成功: " + qrCodeMessage);
           }
 
           qrScanner.stop().then(()=>{
