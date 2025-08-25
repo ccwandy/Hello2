@@ -51,6 +51,7 @@ thead th { text-align: left; font-weight: 600; color: var(--muted);
 tbody td { padding: 12px 10px; border-bottom: 1px dashed #1f2330; vertical-align: top; }
 tbody tr:hover { background: rgba(255,255,255,0.03); }
 .empty { color: var(--muted); text-align: center; padding: 20px; }
+.zoom-controls { display:flex; align-items:center; gap:8px; margin-top:8px; }
 </style>
 <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
@@ -63,15 +64,19 @@ tbody tr:hover { background: rgba(255,255,255,0.03); }
       <div class="grow">
         <label class="desc">QR Code 掃描</label>
         <button id="startScanBtn" class="btn-secondary" type="button">開始掃描</button>
-        <label for="zoomSelect" class="desc" style="display:block; margin-top:8px;">放大倍率</label>
-        <select id="zoomSelect">
-          <option value="1">1倍</option>
-          <option value="2">2倍</option>
-          <option value="3">3倍</option>
-          <option value="4">4倍</option>
-        </select>
+        
+        <!-- 改成 - / + 按鈕 -->
+        <label class="desc" style="display:block; margin-top:8px;">放大倍率</label>
+        <div class="zoom-controls">
+          <button id="zoomOutBtn" type="button">-</button>
+          <span id="zoomValue">100%</span>
+          <button id="zoomInBtn" type="button">+</button>
+        </div>
+        
         <div id="qrReader" style="width:100%; max-width:400px; margin-top:8px; display:none;"></div>
       </div>
+      
+      <!-- 其他輸入欄位 -->
       <div class="grow">
         <label class="desc">財產編號</label>
         <input id="propIdInput" type="text" placeholder="Ex：英文字母+6位數字、10位數字" />
@@ -246,24 +251,45 @@ clearBtn.addEventListener("click", () => { propIdInput.value=""; serialInput.val
 clearBtn2.addEventListener("click", () => { if(confirm("確定要清除所有資料嗎？")){ entries=[]; renderTable(); } });
 
 // ========== QR Code 掃描 + 自動解析 + 自動新增 ==========
+// ========== QR Code Zoom 控制 ==========
 let qrScanner=null;
 let videoTrack=null;
-const startScanBtn=document.getElementById('startScanBtn');
+let zoomPercent = 100; // 初始 100%
+const zoomValueSpan = document.getElementById("zoomValue");
+const zoomInBtn = document.getElementById("zoomInBtn");
+const zoomOutBtn = document.getElementById("zoomOutBtn");
 const qrReader=document.getElementById('qrReader');
-const zoomSelect=document.getElementById('zoomSelect');
 
-async function applyZoom(level){
-  if(!videoTrack) return;
+async function applyZoom(percent){
+  if(!videoTrack) {
+    qrReader.style.transform=`scale(${percent/100})`;
+    return;
+  }
   const capabilities=videoTrack.getCapabilities();
   if(capabilities.zoom){
     const min=capabilities.zoom.min, max=capabilities.zoom.max;
-    let zoomValue=Math.min(max, Math.max(min, level));
+    // 轉換成相機支援範圍
+    let zoomValue = min + (max-min)*(percent-100)/(300-100);
+    zoomValue = Math.min(max, Math.max(min, zoomValue));
     await videoTrack.applyConstraints({ advanced:[{ zoom: zoomValue }] });
   } else {
-    qrReader.style.transform=`scale(${level})`;
+    qrReader.style.transform=`scale(${percent/100})`;
   }
+  zoomValueSpan.textContent = percent+"%";
 }
-zoomSelect.addEventListener("change", ()=> applyZoom(parseFloat(zoomSelect.value)));
+
+zoomInBtn.addEventListener("click", ()=>{
+  if(zoomPercent < 300){
+    zoomPercent += 10;
+    applyZoom(zoomPercent);
+  }
+});
+zoomOutBtn.addEventListener("click", ()=>{
+  if(zoomPercent > 100){
+    zoomPercent -= 10;
+    applyZoom(zoomPercent);
+  }
+});
 
 startScanBtn.addEventListener('click', async ()=>{
   if(qrScanner){
