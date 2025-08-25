@@ -137,7 +137,7 @@ tbody tr:hover { background: rgba(255,255,255,0.03); }
 
 <script>
 // ========== Google Sheet 同步函式 ==========
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzxHLBTPJQhYezQg1caEd3JzXo1-WC9582cyvdE2MxuradwASnwDe5U80aqG6IAkIaZ/exec";
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxkUrM_BRFTQrxgYkiqZsts8VnbJkeAyImJkfAEgyMtv9Tln-MG1qtOAmBjtrnGy56MyQ/exec";
 
 async function syncToSheet(entry) {
   const body = new URLSearchParams(entry);
@@ -196,7 +196,7 @@ function renderTable() {
 // 新增資料並同步到 Google Sheet
 addBtn.addEventListener("click", async () => {
   const propId = propIdInput.value.trim();
-  const serial = serialInput.value.trim();
+  let serial = serialInput.value.trim();
   const note = noteInput.value.trim();
   const location = locationSelect.value;
   const method = methodSelect.value;
@@ -206,9 +206,12 @@ addBtn.addEventListener("click", async () => {
     return;
   }
 
+  // ✅ 固定補滿 4 碼（不足補 0）
+  serial = serial.padStart(4, "0");
+
   const now = new Date();
   const entry = {
-    index: entries.length + 1, // ✅ 新增序號
+    index: entries.length + 1,
     propId,
     serial,
     note,
@@ -219,6 +222,9 @@ addBtn.addEventListener("click", async () => {
 
   entries.push(entry);
   renderTable();
+
+  propIdInput.value = "";
+  serialInput.value = "";
   noteInput.value = "";
 
   try {
